@@ -46,7 +46,7 @@ The gateway sends header **`X-Internal-Api-Key`**. The same secret must be confi
 |---------|---------|---------------------------|
 | Outbound HTTP timeout (seconds) | `30` | `FunctionEndpoints__TimeoutSeconds` |
 | CORS allowed origins | none (CORS disabled) | `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, … |
-| OpenAPI document (`/openapi/v1.json`) | `false` | `OpenApi__Enabled` |
+| OpenAPI document (`/openapi/v1.json`) | `false` (Development only when `OpenApi:Enabled`) | `OpenApi__Enabled` |
 
 ### Secrets
 
@@ -84,6 +84,7 @@ FunctionEndpoints__SignupUrl=https://<internal-signup-host>
 FunctionEndpoints__LoginUrl=https://<internal-login-host>
 Cors__AllowedOrigins__0=https://<your-frontend-origin>
 OpenApi__Enabled=false
+AllowedHosts__0=<your-public-hostname>
 ASPNETCORE_ENVIRONMENT=Production
 ```
 

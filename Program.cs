@@ -17,7 +17,8 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddHealthChecks();
 
 var openApiEnabled = builder.Configuration.GetSection(GatewayOpenApiOptions.SectionName).Get<GatewayOpenApiOptions>()?.Enabled ?? false;
-if (openApiEnabled)
+var exposeOpenApi = openApiEnabled && builder.Environment.IsDevelopment();
+if (exposeOpenApi)
 {
     builder.Services.AddOpenApi();
 }
@@ -42,7 +43,7 @@ if (corsOrigins.Length > 0)
     app.UseCors(CorsOptions.SectionName);
 }
 
-if (openApiEnabled)
+if (exposeOpenApi)
 {
     app.MapOpenApi();
 }
