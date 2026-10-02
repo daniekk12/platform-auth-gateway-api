@@ -10,19 +10,7 @@ builder.Services.AddGatewayCors(builder.Configuration);
 builder.Services.AddControllers();
 builder.Services.AddHealthChecks();
 
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
-}
-
 var app = builder.Build();
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
 
 var corsOrigins = builder.Configuration.GetSection(CorsOptions.SectionName).Get<string[]>() ?? [];
 if (corsOrigins.Length > 0)
