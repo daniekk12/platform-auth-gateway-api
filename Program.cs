@@ -1,8 +1,11 @@
 using Platform.Auth.Gateway.Api.Configuration;
 using Platform.Auth.Gateway.Api.Extensions;
 using Platform.Auth.Gateway.Api.Filters;
+using Platform.Auth.Gateway.Api.Hosting;
 using Platform.Auth.Gateway.Api.Infrastructure;
 using Platform.Auth.Gateway.Api.Middleware;
+
+ContainerPortBinding.ApplyIfConfigured();
 
 var builder = WebApplication.CreateBuilder(args);
 
