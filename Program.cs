@@ -22,7 +22,6 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-    app.MapGet("/", () => Results.Redirect("/swagger"));
 }
 
 var corsOrigins = builder.Configuration.GetSection(CorsOptions.SectionName).Get<string[]>() ?? [];
