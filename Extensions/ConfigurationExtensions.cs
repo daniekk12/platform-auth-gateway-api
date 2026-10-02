@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Platform.Auth.Gateway.Api.Configuration;
 
 namespace Platform.Auth.Gateway.Api.Extensions;
@@ -9,6 +10,9 @@ public static class ConfigurationExtensions
         IConfiguration configuration)
     {
         services.Configure<CorsOptions>(configuration.GetSection(CorsOptions.SectionName));
+        services.Configure<GatewayOpenApiOptions>(configuration.GetSection(GatewayOpenApiOptions.SectionName));
+
+        services.AddSingleton<IValidateOptions<FunctionEndpointsOptions>, FunctionEndpointsOptionsValidator>();
 
         services.AddOptions<FunctionEndpointsOptions>()
             .Bind(configuration.GetSection(FunctionEndpointsOptions.SectionName))

@@ -23,7 +23,7 @@ public sealed class AuthFunctionClientTests
         var client = CreateClient(handler, timeoutSeconds: 30);
 
         var result = await client.SignupAsync(
-            new SignupRequest("user@example.com", "Password123!"),
+            new SignupRequest { Email = "user@example.com", Password = "Password123!" },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -39,7 +39,7 @@ public sealed class AuthFunctionClientTests
         var client = CreateClient(handler, timeoutSeconds: 30);
 
         var result = await client.LoginAsync(
-            new LoginRequest("user@example.com", "Password123!"),
+            new LoginRequest { Email = "user@example.com", Password = "Password123!" },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -58,7 +58,7 @@ public sealed class AuthFunctionClientTests
         var client = CreateClient(handler, timeoutSeconds: 30);
 
         var result = await client.SignupAsync(
-            new SignupRequest("user@example.com", "Password123!"),
+            new SignupRequest { Email = "user@example.com", Password = "Password123!" },
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -78,7 +78,7 @@ public sealed class AuthFunctionClientTests
         var client = CreateClient(handler, timeoutSeconds: 30);
 
         var result = await client.LoginAsync(
-            new LoginRequest("user@example.com", "Password123!"),
+            new LoginRequest { Email = "user@example.com", Password = "Password123!" },
             CancellationToken.None);
 
         Assert.False(result.IsSuccess);
@@ -95,7 +95,7 @@ public sealed class AuthFunctionClientTests
         var client = CreateClient(handler, timeoutSeconds: 30);
 
         var result = await client.SignupAsync(
-            new SignupRequest("user@example.com", "Password123!"),
+            new SignupRequest { Email = "user@example.com", Password = "Password123!" },
             CancellationToken.None);
 
         Assert.Equal(FunctionCallFailureKind.Unavailable, result.FailureKind);
@@ -114,7 +114,7 @@ public sealed class AuthFunctionClientTests
         var client = CreateClient(handler, timeoutSeconds: 1);
 
         var result = await client.LoginAsync(
-            new LoginRequest("user@example.com", "Password123!"),
+            new LoginRequest { Email = "user@example.com", Password = "Password123!" },
             CancellationToken.None);
 
         Assert.Equal(FunctionCallFailureKind.Timeout, result.FailureKind);
@@ -135,22 +135,47 @@ public sealed class AuthFunctionClientTests
             loginUrl: LoginBaseUrl);
 
         await client.SignupAsync(
-            new SignupRequest("user@example.com", "Password123!"),
+            new SignupRequest { Email = "user@example.com", Password = "Password123!" },
             CancellationToken.None);
 
         Assert.Equal($"{customBase}/signup", handler.LastRequest!.RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task SignupAsync_sends_internal_api_key_header()
+    {
+        var handler = new StubHttpMessageHandler((_, _) =>
+            Task.FromResult(JsonOk(new SignupResponse("ok", "user@example.com"))));
+
+        var client = CreateClient(
+            handler,
+            timeoutSeconds: 30,
+            apiKey: "expected-internal-key");
+
+        await client.SignupAsync(
+            new SignupRequest { Email = "user@example.com", Password = "Password123!" },
+            CancellationToken.None);
+
+        Assert.True(handler.LastRequest!.Headers.TryGetValues(
+            FunctionInvocationOptions.InternalHeaderName,
+            out var values));
+        Assert.Equal("expected-internal-key", values.Single());
     }
 
     private static AuthFunctionClient CreateClient(
         StubHttpMessageHandler handler,
         int timeoutSeconds,
         string signupUrl = SignupBaseUrl,
-        string loginUrl = LoginBaseUrl)
+        string loginUrl = LoginBaseUrl,
+        string apiKey = "test-key")
     {
         var httpClient = new HttpClient(handler)
         {
             Timeout = TimeSpan.FromSeconds(timeoutSeconds)
         };
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+            FunctionInvocationOptions.InternalHeaderName,
+            apiKey);
 
         var factory = new SingleHttpClientFactory(httpClient);
 

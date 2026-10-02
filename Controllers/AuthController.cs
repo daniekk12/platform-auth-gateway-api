@@ -1,11 +1,14 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Platform.Auth.Gateway.Api.Contracts;
+using Platform.Auth.Gateway.Api.Filters;
 using Platform.Auth.Gateway.Api.Services;
 
 namespace Platform.Auth.Gateway.Api.Controllers;
 
 [ApiController]
 [Route("auth")]
+[ServiceFilter(typeof(AuthResponseCacheFilter))]
 public sealed class AuthController : ControllerBase
 {
     private readonly IAuthFunctionClient _authFunctionClient;
@@ -17,7 +20,6 @@ public sealed class AuthController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>Proxies signup to the signup function.</summary>
     [HttpPost("signup")]
     [ProducesResponseType(typeof(SignupResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -28,18 +30,17 @@ public sealed class AuthController : ControllerBase
         [FromBody] SignupRequest? request,
         CancellationToken cancellationToken)
     {
-        if (!TryValidateAuthRequest(request, out var validationProblem))
+        if (!TryValidateRequest(request, out var validationProblem))
         {
             return validationProblem!;
         }
 
-        _logger.LogInformation("Signup request received");
+        _logger.LogInformation("Signup request received for correlation {CorrelationId}", HttpContext.TraceIdentifier);
 
         var result = await _authFunctionClient.SignupAsync(request!, cancellationToken);
         return FunctionCallResultMapper.ToActionResult(result);
     }
 
-    /// <summary>Proxies login to the login function.</summary>
     [HttpPost("login")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -50,56 +51,63 @@ public sealed class AuthController : ControllerBase
         [FromBody] LoginRequest? request,
         CancellationToken cancellationToken)
     {
-        if (!TryValidateAuthRequest(request, out var validationProblem))
+        if (!TryValidateRequest(request, out var validationProblem))
         {
             return validationProblem!;
         }
 
-        _logger.LogInformation("Login request received");
+        _logger.LogInformation("Login request received for correlation {CorrelationId}", HttpContext.TraceIdentifier);
 
         var result = await _authFunctionClient.LoginAsync(request!, cancellationToken);
         return FunctionCallResultMapper.ToActionResult(result);
     }
 
-    private static bool TryValidateAuthRequest<T>(T? request, out IActionResult? problem)
+    private bool TryValidateRequest<T>(T? request, out IActionResult? problem)
         where T : class
     {
         problem = null;
 
         if (request is null)
         {
-            problem = new BadRequestObjectResult(CreateValidationProblem("Request body is required."));
+            problem = ValidationProblem(CreateValidationProblem("Request body is required."));
             return false;
         }
 
-        string? email = request switch
+        var validationContext = new ValidationContext(request);
+        var validationResults = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(request, validationContext, validationResults, validateAllProperties: true))
         {
-            SignupRequest signup => signup.Email,
-            LoginRequest login => login.Email,
-            _ => null
-        };
-
-        string? password = request switch
-        {
-            SignupRequest signup => signup.Password,
-            LoginRequest login => login.Password,
-            _ => null
-        };
-
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
-        {
-            problem = new BadRequestObjectResult(CreateValidationProblem("Email and password are required."));
+            problem = ValidationProblem(CreateValidationProblemFromResults(validationResults));
             return false;
         }
 
         return true;
     }
 
-    private static object CreateValidationProblem(string detail) =>
-        new
+    private static ValidationProblemDetails CreateValidationProblem(string detail) =>
+        new(new Dictionary<string, string[]>
         {
-            title = "Validation failed",
-            status = StatusCodes.Status400BadRequest,
-            detail
+            [""] = [detail]
+        })
+        {
+            Title = "Validation failed",
+            Status = StatusCodes.Status400BadRequest,
+            Detail = detail
         };
+
+    private static ValidationProblemDetails CreateValidationProblemFromResults(IEnumerable<ValidationResult> results)
+    {
+        var errors = new Dictionary<string, string[]>();
+        foreach (var result in results)
+        {
+            var key = result.MemberNames.FirstOrDefault() ?? string.Empty;
+            errors[key] = [result.ErrorMessage ?? "Validation failed."];
+        }
+
+        return new ValidationProblemDetails(errors)
+        {
+            Title = "Validation failed",
+            Status = StatusCodes.Status400BadRequest
+        };
+    }
 }

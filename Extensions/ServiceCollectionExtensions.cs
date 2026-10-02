@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using Platform.Auth.Gateway.Api.Configuration;
+using Platform.Auth.Gateway.Api.Http;
 using Platform.Auth.Gateway.Api.Services;
 
 namespace Platform.Auth.Gateway.Api.Extensions;
@@ -8,6 +9,9 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddGatewayServices(this IServiceCollection services)
     {
+        services.AddHttpContextAccessor();
+        services.AddTransient<CorrelationIdDelegatingHandler>();
+
         services.AddHttpClient(AuthFunctionClient.HttpClientName)
             .ConfigureHttpClient((serviceProvider, client) =>
             {
@@ -17,7 +21,8 @@ public static class ServiceCollectionExtensions
                 client.DefaultRequestHeaders.TryAddWithoutValidation(
                     FunctionInvocationOptions.InternalHeaderName,
                     invocationOptions.ApiKey);
-            });
+            })
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>();
 
         services.AddSingleton<IAuthFunctionClient, AuthFunctionClient>();
 

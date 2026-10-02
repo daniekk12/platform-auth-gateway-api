@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Platform.Auth.Gateway.Api.Tests;
@@ -8,12 +10,7 @@ public sealed class GatewayWebTests : IClassFixture<WebApplicationFactory<Progra
 
     public GatewayWebTests(WebApplicationFactory<Program> factory)
     {
-        _client = factory.WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("FunctionInvocation:ApiKey", "test-internal-key");
-            builder.UseSetting("FunctionEndpoints:SignupUrl", "http://localhost:5001");
-            builder.UseSetting("FunctionEndpoints:LoginUrl", "http://localhost:5002");
-        }).CreateClient();
+        _client = factory.WithWebHostBuilder(AuthControllerValidationTests.ConfigureRequiredSettings).CreateClient();
     }
 
     [Fact]
