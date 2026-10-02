@@ -28,8 +28,6 @@ Client → Gateway → Function Host → Functions
 | POST | `/auth/login` | Forwards to login function (`POST {LoginUrl}/login`) |
 | GET | `/health` | Gateway liveness |
 
-Swagger UI is enabled in the Development environment.
-
 ## Configuration
 
 Function endpoints use the **Options pattern** (`FunctionEndpointsOptions`). Environment variables override `appsettings` (ASP.NET Core default precedence).
