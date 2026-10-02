@@ -109,11 +109,11 @@ Standalone repository: no `.sln`, no project references to other Platform Auth c
 
 This is a **free-tier learning deployment**, not a production reliability guarantee. Render free Web Services **sleep after inactivity**, have **cold starts**, and **limited CPU/RAM**.
 
-### Recommended approach (beginner)
+### Recommended approach
 
-Connect each GitHub repository to Render and enable **automatic deploys** from `main` after CI passes. Configure **environment variables in the Render dashboard** (simplest and safest). Do not commit secrets.
+**GitHub Actions is the source of truth** for environment variables. See [`.github/RENDER_GITHUB_CONFIG.md`](.github/RENDER_GITHUB_CONFIG.md) for required Secrets/Variables and one-time Render service setup.
 
-Optional: add GitHub secret `RENDER_DEPLOY_HOOK_URL` and use `.github/workflows/render-deploy.yml` to POST to Render’s deploy hook after CI on `main`. Deploy hooks **do not** copy environment variables from GitHub to Render.
+The deploy workflow syncs env vars via Render API (`PUT /v1/services/{serviceId}/env-vars`), triggers deploy (`POST …/deploys`), and verifies `PUBLIC_HEALTH_URL`.
 
 ### Deployment order (all three services)
 
@@ -132,22 +132,27 @@ Optional: add GitHub secret `RENDER_DEPLOY_HOOK_URL` and use `.github/workflows/
 | Health check path | `/health` |
 | Instance type | Free |
 
-### Gateway environment variables (Render dashboard)
+### Gateway environment variables (GitHub Actions)
 
-**Secrets (Sensitive):**
+Configure these in GitHub (**Settings → Secrets and variables → Actions**), not in the Render dashboard. Full names and setup: [`.github/RENDER_GITHUB_CONFIG.md`](.github/RENDER_GITHUB_CONFIG.md).
+
+**Secrets:**
 
 | Key | Description |
 |-----|-------------|
+| `RENDER_API_KEY` | Authenticates Render API calls from the deploy workflow |
 | `FunctionInvocation__ApiKey` | Shared secret; same value on signup and login services |
 
-**Non-secret:**
+**Variables:**
 
 | Key | Example shape |
 |-----|----------------|
+| `RENDER_SERVICE_ID` | `srv-…` (this gateway service) |
+| `PUBLIC_HEALTH_URL` | `https://<your-gateway-service>/health` |
 | `FunctionEndpoints__SignupUrl` | `https://<your-signup-service>.onrender.com` |
 | `FunctionEndpoints__LoginUrl` | `https://<your-login-service>.onrender.com` |
 | `FunctionEndpoints__TimeoutSeconds` | `30` |
-| `Cors__AllowedOrigins__0` | Your frontend origin (if any) |
+| `Cors__AllowedOrigins__0` | Your frontend origin (optional) |
 | `AllowedHosts__0` | `<your-gateway-service>.onrender.com` |
 | `ASPNETCORE_ENVIRONMENT` | `Production` |
 | `OpenApi__Enabled` | `false` |
@@ -183,10 +188,6 @@ curl -fsS "https://<your-gateway-host>/health"
 | Workflow | Purpose |
 |----------|---------|
 | `.github/workflows/ci.yml` | Restore, Release build, tests on PRs and pushes to `main` |
-| `.github/workflows/render-deploy.yml` | Optional deploy hook after successful CI on `main` |
+| `.github/workflows/render-deploy.yml` | After successful CI on `main`: sync env vars to Render API, deploy, verify health |
 
-Create GitHub Environment **`production`** if you use the deploy workflow with protection rules.
-
-### Alternative: GitHub Variables + Render API
-
-Render’s API can update service env vars, but schemas and permissions change. For this demo, **prefer the Render dashboard** unless you have verified API steps. Never store Render API keys or secrets in the repository.
+Create GitHub Environment **`production`** (required). Restrict it to the `main` branch; add reviewers if desired. Deploy does not run from pull requests.

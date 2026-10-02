@@ -7,24 +7,39 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: render-production-deploy
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
 jobs:
   deploy:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Trigger Render deploy hook
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Sync environment variables and deploy
         env:
-          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: |
-          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
-            echo "RENDER_DEPLOY_HOOK_URL is not set. Configure the secret or use Render's GitHub auto-deploy."
-            exit 0
-          fi
-          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+          PUBLIC_HEALTH_URL: ${{ vars.PUBLIC_HEALTH_URL }}
+          ASPNETCORE_ENVIRONMENT: ${{ vars.ASPNETCORE_ENVIRONMENT }}
+          FunctionInvocation__ApiKey: ${{ secrets.FunctionInvocation__ApiKey }}
+          FunctionEndpoints__SignupUrl: ${{ vars.FunctionEndpoints__SignupUrl }}
+          FunctionEndpoints__LoginUrl: ${{ vars.FunctionEndpoints__LoginUrl }}
+          FunctionEndpoints__TimeoutSeconds: ${{ vars.FunctionEndpoints__TimeoutSeconds }}
+          AllowedHosts__0: ${{ vars.AllowedHosts__0 }}
+          OpenApi__Enabled: ${{ vars.OpenApi__Enabled }}
+          Cors__AllowedOrigins__0: ${{ vars.Cors__AllowedOrigins__0 }}
+        run: python .github/scripts/render_sync_deploy.py
