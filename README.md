@@ -1,6 +1,6 @@
 # platform-auth-gateway-api
 
-Public HTTP entry point for Platform Auth. Routes authentication requests to Signup and Login **Functions** through `IAuthFunctionClient` (HTTP today; endpoint URLs are configuration-only so a future Function Host can replace the target without architectural changes).
+Public HTTPS entry point for Platform Auth. Routes authentication requests to Signup and Login **Functions** through `IAuthFunctionClient`. Endpoint URLs and secrets are supplied only through configuration (no hardcoded production values in code).
 
 The Gateway does **not** contain signup or login business logic and does **not** reference function projects.
 
@@ -10,67 +10,85 @@ The Gateway does **not** contain signup or login business logic and does **not**
 Client
   ↓
 Gateway (this repo)
-  ↓
+  ↓  X-Internal-Api-Key
 Signup Function / Login Function
-```
-
-Future:
-
-```text
-Client → Gateway → Function Host → Functions
 ```
 
 ## Routes
 
-**Clients must call signup and login only through this gateway** (`POST /auth/signup` and `POST /auth/login`). Do not call the function ports directly from browsers or apps.
+**Clients must call signup and login only through this gateway** (`POST /auth/signup` and `POST /auth/login`).
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/auth/signup` | Forwards to signup function (`POST {SignupUrl}/signup`) |
-| POST | `/auth/login` | Forwards to login function (`POST {LoginUrl}/login`) |
-| GET | `/health` | Gateway liveness |
+| POST | `/auth/signup` | Forwards to signup function |
+| POST | `/auth/login` | Forwards to login function |
+| GET | `/health` | Gateway liveness (no downstream dependency) |
 
 ## Configuration
 
-Function endpoints use the **Options pattern** (`FunctionEndpointsOptions`). Environment variables override `appsettings` (ASP.NET Core default precedence).
+Configuration uses the ASP.NET Core options pattern. **Environment variables override** `appsettings` files. Use the `__` convention for nested keys.
 
-| Setting | Environment variable (alias) | Nested configuration key |
-|---------|------------------------------|---------------------------|
-| Signup base URL | `SIGNUP_FUNCTION_URL` | `FunctionEndpoints__SignupUrl` |
-| Login base URL | `LOGIN_FUNCTION_URL` | `FunctionEndpoints__LoginUrl` |
-| HTTP timeout (seconds) | — | `FunctionEndpoints__TimeoutSeconds` |
-| Internal invocation key (gateway → functions) | — | `FunctionInvocation__ApiKey` |
+Committed JSON contains **placeholders only** for secrets and production URLs. Missing required settings cause **startup failure** (`ValidateOnStart`).
 
-The gateway sends `X-Platform-Auth-Internal-Key` on every function call. The same value must be configured on signup and login functions (`FunctionInvocation:ApiKey`). Requests to `/signup` or `/login` without that header receive **403 Forbidden**.
+### Required (production)
 
-`appsettings.json` ships with empty URLs. Local values belong in `appsettings.Development.json` (not for production) or in environment variables.
+| Purpose | Environment variable | Nested key |
+|---------|---------------------|------------|
+| Signup function base URL (HTTPS in Production) | `SIGNUP_FUNCTION_URL` (alias) or `FunctionEndpoints__SignupUrl` | `FunctionEndpoints:SignupUrl` |
+| Login function base URL (HTTPS in Production) | `LOGIN_FUNCTION_URL` (alias) or `FunctionEndpoints__LoginUrl` | `FunctionEndpoints:LoginUrl` |
+| Internal API key (gateway → functions) | `FunctionInvocation__ApiKey` | `FunctionInvocation:ApiKey` |
 
-Example (PowerShell, session-scoped):
+The gateway sends header **`X-Internal-Api-Key`**. The same secret must be configured on signup and login functions.
 
-```powershell
-$env:FunctionEndpoints__SignupUrl = "http://localhost:5001"
-$env:FunctionEndpoints__LoginUrl = "http://localhost:5002"
-$env:ASPNETCORE_ENVIRONMENT = "Development"
-dotnet run --launch-profile http
+### Optional
+
+| Purpose | Default | Environment variable / key |
+|---------|---------|---------------------------|
+| Outbound HTTP timeout (seconds) | `30` | `FunctionEndpoints__TimeoutSeconds` |
+| CORS allowed origins | none (CORS disabled) | `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, … |
+| OpenAPI document (`/openapi/v1.json`) | `false` (Development only when `OpenApi:Enabled`) | `OpenApi__Enabled` |
+
+### Secrets
+
+- **`FunctionInvocation:ApiKey`** — treat as a secret. Never commit, log, or return in API responses.
+- Passwords from client requests are validated but **never logged**.
+
+### Local development
+
+1. Trust the dev certificate (once): `dotnet dev-certs https --trust`
+2. Configure the internal API key with **User Secrets** (not committed):
+
+```bash
+dotnet user-secrets set "FunctionInvocation:ApiKey" "<your-local-internal-api-key>"
 ```
 
-Optional CORS (Development example in `appsettings.Development.json`):
+3. Non-secret dev defaults (function HTTPS URLs, CORS, OpenAPI) live in `appsettings.Development.json`.
+4. Run: `dotnet run --launch-profile https` (listens on `https://localhost:5000`).
+
+Example overrides (PowerShell):
+
+```powershell
+$env:FunctionInvocation__ApiKey = "<your-local-internal-api-key>"
+$env:FunctionEndpoints__SignupUrl = "https://localhost:5001"
+$env:FunctionEndpoints__LoginUrl = "https://localhost:5002"
+dotnet run --launch-profile https
+```
+
+### Production deployment
+
+Set required variables in the hosting environment (examples):
 
 ```text
-Cors__AllowedOrigins__0=http://localhost:4200
+FunctionInvocation__ApiKey=<secret>
+FunctionEndpoints__SignupUrl=https://<internal-signup-host>
+FunctionEndpoints__LoginUrl=https://<internal-login-host>
+Cors__AllowedOrigins__0=https://<your-frontend-origin>
+OpenApi__Enabled=false
+AllowedHosts__0=<your-public-hostname>
+ASPNETCORE_ENVIRONMENT=Production
 ```
 
 Do not commit `.env` / `.env.local` files (see `.gitignore`).
-
-## Run locally
-
-Start Signup and Login functions first, then:
-
-```bash
-dotnet run --launch-profile http
-```
-
-Gateway listens on port **5000** (see `Properties/launchSettings.json`).
 
 ## Tests
 
@@ -78,10 +96,11 @@ Gateway listens on port **5000** (see `Properties/launchSettings.json`).
 dotnet test tests/Platform.Auth.Gateway.Api.Tests/Platform.Auth.Gateway.Api.Tests.csproj
 ```
 
-## Build
+## Build & publish
 
 ```bash
 dotnet build
+dotnet publish -c Release
 ```
 
 Standalone repository: no `.sln`, no project references to other Platform Auth components.

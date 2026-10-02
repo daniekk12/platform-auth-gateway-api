@@ -35,7 +35,8 @@ public static class FunctionCallResultMapper
     private static IActionResult CreateDownstreamClientErrorResult<T>(FunctionCallResult<T> result)
         where T : class
     {
-        if (TryParseJsonObject(result.ResponseBody, out var document))
+        if (TryParseJsonObject(result.ResponseBody, out var document)
+            && !BodyMayLeakInternals(result.ResponseBody))
         {
             return new ObjectResult(document) { StatusCode = result.StatusCode };
         }
@@ -45,6 +46,10 @@ public static class FunctionCallResultMapper
             StatusCode = result.StatusCode
         };
     }
+
+    private static bool BodyMayLeakInternals(string? body) =>
+        !string.IsNullOrEmpty(body)
+        && body.Contains("://", StringComparison.OrdinalIgnoreCase);
 
     private static object CreateProblem(int statusCode, string title) =>
         new

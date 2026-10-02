@@ -1,23 +1,28 @@
 using Microsoft.Extensions.Options;
 using Platform.Auth.Gateway.Api.Configuration;
+using Platform.Auth.Gateway.Api.Http;
 using Platform.Auth.Gateway.Api.Services;
-
 namespace Platform.Auth.Gateway.Api.Extensions;
 
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddGatewayServices(this IServiceCollection services)
     {
+        services.AddHttpContextAccessor();
+        services.AddTransient<CorrelationIdDelegatingHandler>();
+        services.AddTransient<AuthFunctionRequestTimeoutHandler>();
+
         services.AddHttpClient(AuthFunctionClient.HttpClientName)
             .ConfigureHttpClient((serviceProvider, client) =>
             {
-                var endpointOptions = serviceProvider.GetRequiredService<IOptions<FunctionEndpointsOptions>>().Value;
                 var invocationOptions = serviceProvider.GetRequiredService<IOptions<FunctionInvocationOptions>>().Value;
-                client.Timeout = TimeSpan.FromSeconds(endpointOptions.TimeoutSeconds);
+                client.Timeout = Timeout.InfiniteTimeSpan;
                 client.DefaultRequestHeaders.TryAddWithoutValidation(
                     FunctionInvocationOptions.InternalHeaderName,
                     invocationOptions.ApiKey);
-            });
+            })
+            .AddHttpMessageHandler<AuthFunctionRequestTimeoutHandler>()
+            .AddHttpMessageHandler<CorrelationIdDelegatingHandler>();
 
         services.AddSingleton<IAuthFunctionClient, AuthFunctionClient>();
 
@@ -28,8 +33,9 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var corsSection = configuration.GetSection(CorsOptions.SectionName);
-        var allowedOrigins = corsSection.Get<string[]>() ?? [];
+        var allowedOrigins = configuration
+            .GetSection(CorsOptions.SectionName)
+            .Get<CorsOptions>()?.AllowedOrigins ?? [];
 
         if (allowedOrigins.Length == 0)
         {
