@@ -104,3 +104,89 @@ dotnet publish -c Release
 ```
 
 Standalone repository: no `.sln`, no project references to other Platform Auth components.
+
+## Deploy to Render (free tier — learning / demo)
+
+This is a **free-tier learning deployment**, not a production reliability guarantee. Render free Web Services **sleep after inactivity**, have **cold starts**, and **limited CPU/RAM**.
+
+### Recommended approach (beginner)
+
+Connect each GitHub repository to Render and enable **automatic deploys** from `main` after CI passes. Configure **environment variables in the Render dashboard** (simplest and safest). Do not commit secrets.
+
+Optional: add GitHub secret `RENDER_DEPLOY_HOOK_URL` and use `.github/workflows/render-deploy.yml` to POST to Render’s deploy hook after CI on `main`. Deploy hooks **do not** copy environment variables from GitHub to Render.
+
+### Deployment order (all three services)
+
+1. Deploy **Signup Function** (this repo’s siblings: `platform-auth-signup-func`).
+2. Deploy **Login Function** (`platform-auth-login-func`).
+3. Note each service’s public **`https://…onrender.com`** base URL (Render assigns these).
+4. Deploy **Gateway** with function URLs and the shared internal API key.
+5. Test: `GET https://<gateway-host>/health`, then `POST /auth/signup` and `/auth/login` through the gateway only.
+
+### Render Web Service settings (Gateway)
+
+| Setting | Value |
+|---------|--------|
+| Environment | Docker |
+| Dockerfile path | `./Dockerfile` |
+| Health check path | `/health` |
+| Instance type | Free |
+
+### Gateway environment variables (Render dashboard)
+
+**Secrets (Sensitive):**
+
+| Key | Description |
+|-----|-------------|
+| `FunctionInvocation__ApiKey` | Shared secret; same value on signup and login services |
+
+**Non-secret:**
+
+| Key | Example shape |
+|-----|----------------|
+| `FunctionEndpoints__SignupUrl` | `https://<your-signup-service>.onrender.com` |
+| `FunctionEndpoints__LoginUrl` | `https://<your-login-service>.onrender.com` |
+| `FunctionEndpoints__TimeoutSeconds` | `30` |
+| `Cors__AllowedOrigins__0` | Your frontend origin (if any) |
+| `AllowedHosts__0` | `<your-gateway-service>.onrender.com` |
+| `ASPNETCORE_ENVIRONMENT` | `Production` |
+| `OpenApi__Enabled` | `false` |
+
+Aliases `SIGNUP_FUNCTION_URL` / `LOGIN_FUNCTION_URL` are also supported for the function base URLs.
+
+Outbound calls use **HTTPS** to the configured function URLs. The gateway sends **`X-Internal-Api-Key`**. Free-tier function URLs are **public**; the API key is required but is **not** a substitute for private networking.
+
+Render sets **`PORT`**; the container binds **`0.0.0.0`** via `Hosting/ContainerPortBinding.cs`.
+
+### Docker (local)
+
+```bash
+docker build -t platform-auth-gateway .
+docker run --rm -p 8080:8080 \
+  -e PORT=8080 \
+  -e ASPNETCORE_ENVIRONMENT=Production \
+  -e FunctionInvocation__ApiKey="<your-local-internal-api-key>" \
+  -e FunctionEndpoints__SignupUrl="https://localhost:5001" \
+  -e FunctionEndpoints__LoginUrl="https://localhost:5002" \
+  platform-auth-gateway
+curl http://localhost:8080/health
+```
+
+### Verify deployment
+
+```bash
+curl -fsS "https://<your-gateway-host>/health"
+```
+
+### GitHub Actions
+
+| Workflow | Purpose |
+|----------|---------|
+| `.github/workflows/ci.yml` | Restore, Release build, tests on PRs and pushes to `main` |
+| `.github/workflows/render-deploy.yml` | Optional deploy hook after successful CI on `main` |
+
+Create GitHub Environment **`production`** if you use the deploy workflow with protection rules.
+
+### Alternative: GitHub Variables + Render API
+
+Render’s API can update service env vars, but schemas and permissions change. For this demo, **prefer the Render dashboard** unless you have verified API steps. Never store Render API keys or secrets in the repository.

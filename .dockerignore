@@ -1,0 +1,10 @@
+**/.git
+**/.github
+**/bin
+**/obj
+**/artifacts
+**/tests
+**/.vs
+**/.vscode
+**/*.user
+**/TestResults
