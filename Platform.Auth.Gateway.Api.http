@@ -1,6 +1,23 @@
-@Platform.Auth.Gateway.Api_HostAddress = http://localhost:5127
+@Platform.Auth.Gateway.Api_HostAddress = https://localhost:5000
 
-GET {{Platform.Auth.Gateway.Api_HostAddress}}/weatherforecast/
+### Health
+GET {{Platform.Auth.Gateway.Api_HostAddress}}/health
 Accept: application/json
 
-###
+### Signup (set FunctionInvocation:ApiKey via user-secrets or env for local runs)
+POST {{Platform.Auth.Gateway.Api_HostAddress}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "<your-password>"
+}
+
+### Login
+POST {{Platform.Auth.Gateway.Api_HostAddress}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "<your-password>"
+}

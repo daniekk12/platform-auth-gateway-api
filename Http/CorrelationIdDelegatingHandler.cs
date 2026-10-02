@@ -5,6 +5,7 @@ namespace Platform.Auth.Gateway.Api.Http;
 public sealed class CorrelationIdDelegatingHandler : DelegatingHandler
 {
     private const string CorrelationHeaderName = "X-Correlation-ID";
+    private const string TraceParentHeaderName = "traceparent";
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public CorrelationIdDelegatingHandler(IHttpContextAccessor httpContextAccessor)
@@ -17,10 +18,18 @@ public sealed class CorrelationIdDelegatingHandler : DelegatingHandler
         CancellationToken cancellationToken)
     {
         var httpContext = _httpContextAccessor.HttpContext;
-        if (httpContext is not null
-            && !request.Headers.Contains(CorrelationHeaderName))
+        if (httpContext is not null)
         {
-            request.Headers.TryAddWithoutValidation(CorrelationHeaderName, httpContext.TraceIdentifier);
+            if (!request.Headers.Contains(CorrelationHeaderName))
+            {
+                request.Headers.TryAddWithoutValidation(CorrelationHeaderName, httpContext.TraceIdentifier);
+            }
+
+            if (httpContext.Request.Headers.TryGetValue(TraceParentHeaderName, out var traceParent)
+                && !request.Headers.Contains(TraceParentHeaderName))
+            {
+                request.Headers.TryAddWithoutValidation(TraceParentHeaderName, traceParent.ToString());
+            }
         }
 
         return base.SendAsync(request, cancellationToken);
