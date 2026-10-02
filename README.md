@@ -1,6 +1,6 @@
 # platform-auth-gateway-api
 
-Public HTTP entry point for Platform Auth. Routes authentication requests to Signup and Login **Functions** through `IAuthFunctionClient` (HTTP today; endpoint URLs are configuration-only so a future Function Host can replace the target without architectural changes).
+Public HTTPS entry point for Platform Auth. Routes authentication requests to Signup and Login **Functions** through `IAuthFunctionClient` (HTTPS in local development; endpoint URLs are configuration-only so a future Function Host can replace the target without architectural changes).
 
 The Gateway does **not** contain signup or login business logic and does **not** reference function projects.
 
@@ -48,10 +48,16 @@ The gateway sends `X-Platform-Auth-Internal-Key` on every function call. The sam
 Example (PowerShell, session-scoped):
 
 ```powershell
-$env:FunctionEndpoints__SignupUrl = "http://localhost:5001"
-$env:FunctionEndpoints__LoginUrl = "http://localhost:5002"
+$env:FunctionEndpoints__SignupUrl = "https://localhost:5001"
+$env:FunctionEndpoints__LoginUrl = "https://localhost:5002"
 $env:ASPNETCORE_ENVIRONMENT = "Development"
-dotnet run --launch-profile http
+dotnet run --launch-profile https
+```
+
+Trust the ASP.NET Core HTTPS development certificate once per machine (required for the gateway to call function URLs over HTTPS):
+
+```powershell
+dotnet dev-certs https --trust
 ```
 
 Optional CORS (Development example in `appsettings.Development.json`):
@@ -67,10 +73,10 @@ Do not commit `.env` / `.env.local` files (see `.gitignore`).
 Start Signup and Login functions first, then:
 
 ```bash
-dotnet run --launch-profile http
+dotnet run --launch-profile https
 ```
 
-Gateway listens on port **5000** (see `Properties/launchSettings.json`).
+Gateway listens on **https://localhost:5000** (see `Properties/launchSettings.json`). HTTP is not enabled in the default launch profile.
 
 ## Tests
 
