@@ -22,6 +22,8 @@ Client → Gateway → Function Host → Functions
 
 ## Routes
 
+**Clients must call signup and login only through this gateway** (`POST /auth/signup` and `POST /auth/login`). Do not call the function ports directly from browsers or apps.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/auth/signup` | Forwards to signup function (`POST {SignupUrl}/signup`) |
@@ -37,6 +39,9 @@ Function endpoints use the **Options pattern** (`FunctionEndpointsOptions`). Env
 | Signup base URL | `SIGNUP_FUNCTION_URL` | `FunctionEndpoints__SignupUrl` |
 | Login base URL | `LOGIN_FUNCTION_URL` | `FunctionEndpoints__LoginUrl` |
 | HTTP timeout (seconds) | — | `FunctionEndpoints__TimeoutSeconds` |
+| Internal invocation key (gateway → functions) | — | `FunctionInvocation__ApiKey` |
+
+The gateway sends `X-Platform-Auth-Internal-Key` on every function call. The same value must be configured on signup and login functions (`FunctionInvocation:ApiKey`). Requests to `/signup` or `/login` without that header receive **403 Forbidden**.
 
 `appsettings.json` ships with empty URLs. Local values belong in `appsettings.Development.json` (not for production) or in environment variables.
 

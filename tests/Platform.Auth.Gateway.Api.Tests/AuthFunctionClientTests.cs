@@ -18,7 +18,7 @@ public sealed class AuthFunctionClientTests
     public async Task SignupAsync_posts_to_signup_path_on_configured_base_url()
     {
         var handler = new StubHttpMessageHandler((_, _) =>
-            Task.FromResult(JsonOk(new SignupResponse("Signup function executed"))));
+            Task.FromResult(JsonOk(new SignupResponse("Signup function executed", "user@example.com"))));
 
         var client = CreateClient(handler, timeoutSeconds: 30);
 
@@ -34,7 +34,7 @@ public sealed class AuthFunctionClientTests
     public async Task LoginAsync_posts_to_login_path_on_configured_base_url()
     {
         var handler = new StubHttpMessageHandler((_, _) =>
-            Task.FromResult(JsonOk(new LoginResponse("Login function executed"))));
+            Task.FromResult(JsonOk(new LoginResponse("Login function executed", "user@example.com"))));
 
         var client = CreateClient(handler, timeoutSeconds: 30);
 
@@ -108,7 +108,7 @@ public sealed class AuthFunctionClientTests
         var handler = new StubHttpMessageHandler(async (_, cancellationToken) =>
         {
             await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
-            return JsonOk(new LoginResponse("late"));
+            return JsonOk(new LoginResponse("late", "user@example.com"));
         });
 
         var client = CreateClient(handler, timeoutSeconds: 1);
@@ -126,7 +126,7 @@ public sealed class AuthFunctionClientTests
     {
         const string customBase = "http://custom-signup-host:9001";
         var handler = new StubHttpMessageHandler((_, _) =>
-            Task.FromResult(JsonOk(new SignupResponse("ok"))));
+            Task.FromResult(JsonOk(new SignupResponse("ok", "user@example.com"))));
 
         var client = CreateClient(
             handler,

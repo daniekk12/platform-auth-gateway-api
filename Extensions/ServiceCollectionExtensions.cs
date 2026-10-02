@@ -11,8 +11,12 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient(AuthFunctionClient.HttpClientName)
             .ConfigureHttpClient((serviceProvider, client) =>
             {
-                var options = serviceProvider.GetRequiredService<IOptions<FunctionEndpointsOptions>>().Value;
-                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+                var endpointOptions = serviceProvider.GetRequiredService<IOptions<FunctionEndpointsOptions>>().Value;
+                var invocationOptions = serviceProvider.GetRequiredService<IOptions<FunctionInvocationOptions>>().Value;
+                client.Timeout = TimeSpan.FromSeconds(endpointOptions.TimeoutSeconds);
+                client.DefaultRequestHeaders.TryAddWithoutValidation(
+                    FunctionInvocationOptions.InternalHeaderName,
+                    invocationOptions.ApiKey);
             });
 
         services.AddSingleton<IAuthFunctionClient, AuthFunctionClient>();
