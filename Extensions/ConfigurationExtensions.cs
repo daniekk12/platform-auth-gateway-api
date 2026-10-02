@@ -22,6 +22,13 @@ public static class ConfigurationExtensions
                 $"{FunctionEndpointsOptions.SectionName}.{nameof(FunctionEndpointsOptions.TimeoutSeconds)} must be greater than zero.")
             .ValidateOnStart();
 
+        services.AddOptions<FunctionInvocationOptions>()
+            .Bind(configuration.GetSection(FunctionInvocationOptions.SectionName))
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.ApiKey),
+                $"{FunctionInvocationOptions.SectionName}.{nameof(FunctionInvocationOptions.ApiKey)} is required.")
+            .ValidateOnStart();
+
         return services;
     }
 

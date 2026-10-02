@@ -8,7 +8,12 @@ public sealed class GatewayWebTests : IClassFixture<WebApplicationFactory<Progra
 
     public GatewayWebTests(WebApplicationFactory<Program> factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("FunctionInvocation:ApiKey", "test-internal-key");
+            builder.UseSetting("FunctionEndpoints:SignupUrl", "http://localhost:5001");
+            builder.UseSetting("FunctionEndpoints:LoginUrl", "http://localhost:5002");
+        }).CreateClient();
     }
 
     [Fact]
